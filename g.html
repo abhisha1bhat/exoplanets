@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exoplanet Star Chart Explorer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #canvasContainer {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        #canvas {
+            border: 1px solid black;
+            cursor: crosshair;
+            background-color: black;
+        }
+        .form-control {
+            margin: 10px;
+        }
+        #instructions {
+            color: #555;
+        }
+        #planetInfo {
+            margin-top: 20px;
+            background-color: #e0e0e0;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="homeScreen">
+        <h1>Select an Exoplanet:</h1>
+        <button onclick="navigateToStarChart('Kepler-186f')">Kepler-186f</button>
+        <button onclick="navigateToStarChart('Proxima Centauri b')">Proxima Centauri b</button>
+        <button onclick="navigateToStarChart('TRAPPIST-1e')">TRAPPIST-1e</button>
+        <button onclick="navigateToStarChart('LHS 1140 b')">LHS 1140 b</button>
+        <button onclick="navigateToStarChart('HD 209458 b')">HD 209458 b</button>
+        <button onclick="navigateToStarChart('55 Cancri e')">55 Cancri e</button>
+        <button onclick="navigateToStarChart('GJ 357 d')">GJ 357 d</button>
+        <button onclick="navigateToStarChart('K2-18 b')">K2-18 b</button>
+        <button onclick="navigateToStarChart('Gliese 832 c')">Gliese 832 c</button>
+        <button onclick="navigateToStarChart('HD 40307 g')">HD 40307 g</button>
+    </div>
+
+    <div id="canvasContainer">
+        <h1 id="starChartTitle"></h1>
+        <canvas id="canvas" width="700" height="700"></canvas>
+        <div id="instructions">Select star data source:</div>
+        <button onclick="loadRandomStars()">Load Random Stars</button>
+        <button onclick="loadRealStarData()">Load Real Star Chart Data</button>
+        <input type="text" id="starNameInput" class="form-control" placeholder="Enter star name" />
+        <button onclick="clearCanvas()">Clear Constellation</button>
+        <button onclick="exportCanvas()">Export as Image</button>
+        <button onclick="goBack()">Go Back</button>
+
+        <!-- Planet Information Section -->
+        <div id="planetInfo">
+            <h3>Planet Information</h3>
+            <p id="planetDescription"></p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script>
+        let stars = [];
+        let selectedStars = [];
+        let hoveredStar = null;
+        let scale = 1;
+        let panX = 0, panY = 0;
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const exoplanets = {
+            'Kepler-186f': {
+                ra: 19.635, dec: 46.711,
+                description: "Kepler-186f is an exoplanet located about 492 light-years from Earth. It orbits within the habitable zone of its star and is roughly the size of Earth."
+            },
+            'Proxima Centauri b': {
+                ra: 217.429, dec: -62.679,
+                description: "Proxima Centauri b is the closest known exoplanet to the Solar System. It is orbiting in the habitable zone of the red dwarf star Proxima Centauri."
+            },
+            'TRAPPIST-1e': {
+                ra: 346.62, dec: -5.042,
+                description: "TRAPPIST-1e is an exoplanet in the TRAPPIST-1 system, located about 39 light-years away. It is one of the seven rocky planets orbiting its star."
+            },
+            'LHS 1140 b': {
+                ra: 173.93, dec: -15.08,
+                description: "LHS 1140 b is a super-Earth exoplanet orbiting a red dwarf star. It lies about 40 light-years away and is considered a prime target for studying atmospheres."
+            },
+            'HD 209458 b': {
+                ra: 330.79, dec: 18.88,
+                description: "HD 209458 b, also known as Osiris, is a gas giant exoplanet. It was the first exoplanet observed to transit its host star."
+            },
+            '55 Cancri e': {
+                ra: 133.15, dec: 28.32,
+                description: "55 Cancri e is a super-Earth exoplanet with a scorching surface temperature. It orbits its host star very closely, completing a revolution in less than a day."
+            },
+            'GJ 357 d': {
+                ra: 140.41, dec: -16.9,
+                description: "GJ 357 d is an exoplanet in the habitable zone of its star, located 31 light-years away. It is a super-Earth and one of the most promising candidates for habitability."
+            },
+            'K2-18 b': {
+                ra: 173.04, dec: 7.59,
+                description: "K2-18 b is an exoplanet orbiting a red dwarf star in the habitable zone. It is a super-Earth with a potential atmosphere containing water vapor."
+            },
+            'Gliese 832 c': {
+                ra: 325.45, dec: -46.96,
+                description: "Gliese 832 c is a super-Earth exoplanet, orbiting in the habitable zone of its host star. It is located just 16 light-years from Earth."
+            },
+            'HD 40307 g': {
+                ra: 96.75, dec: -60.56,
+                description: "HD 40307 g is a super-Earth exoplanet located about 42 light-years away. It orbits in the habitable zone of its star and could potentially have liquid water."
+            }
+        };
+
+        function navigateToStarChart(planetName) {
+            document.getElementById('homeScreen').style.display = 'none';
+            document.getElementById('canvasContainer').style.display = 'flex';
+            document.getElementById('starChartTitle').innerText = `Star Chart for ${planetName}`;
+            document.getElementById('planetDescription').innerText = exoplanets[planetName].description;
+            loadStarsForPlanet(planetName);
+        }
+
+        function loadStarsForPlanet(planetName) {
+            let exoplanetCoordinates = exoplanets[planetName]; // Fetch the coordinates
+            stars = translateStarCoordinates(exoplanetCoordinates);
+            drawStars();
+        }
+
+        function translateStarCoordinates(exoplanetCoordinates) {
+            return generateSeededStars(15, exoplanetCoordinates.ra + exoplanetCoordinates.dec);
+        }
+
+        function generateSeededStars(numStars, seed) {
+            let generatedStars = [];
+            let random = seededRandom(seed);
+
+            for (let i = 0; i < numStars; i++) {
+                generatedStars.push({
+                    x: random() * canvas.width,
+                    y: random() * canvas.height,
+                    name: '',
+                    selected: false
+                });
+            }
+            return generatedStars;
+        }
+
+        function seededRandom(seed) {
+            return function() {
+                let x = Math.sin(seed++) * 10000;
+                return x - Math.floor(x);
+            };
+        }
+
+        function loadRealStarData() {
+            stars = [
+                { x: 150, y: 100, name: 'Sirius', selected: false },
+                { x: 300, y: 200, name: 'Betelgeuse', selected: false },
+                { x: 400, y: 300, name: 'Procyon', selected: false },
+                { x: 500, y: 400, name: 'Vega', selected: false }
+            ];
+            drawStars();
+        }
+
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.setTransform(scale, 0, 0, scale, panX, panY);
+
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = hoveredStar === star ? 'white' : (star.selected ? 'red' : 'yellow');
+                ctx.fill();
+                ctx.closePath();
+
+                if (star.name) {
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(star.name, star.x + 10, star.y - 10);
+                }
+            });
+
+            if (selectedStars.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(selectedStars[0].x, selectedStars[0].y);
+                selectedStars.forEach(star => {
+                    ctx.lineTo(star.x, star.y);
+                });
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        canvas.addEventListener('click', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / scale - panX / scale;
+            const y = (event.clientY - rect.top) / scale - panY / scale;
+
+            let clickedStar = stars.find(star => Math.hypot(star.x - x, star.y - y) < 10);
+            if (clickedStar) {
+                clickedStar.selected = !clickedStar.selected;
+
+                if (clickedStar.selected) {
+                    const starName = document.getElementById('starNameInput').value;
+                    if (starName) {
+                        clickedStar.name = starName;
+                        document.getElementById('starNameInput').value = '';
+                    }
+                    selectedStars.push(clickedStar);
+                } else {
+                    selectedStars = selectedStars.filter(star => star !== clickedStar);
+                }
+                drawStars();
+            }
+        });
+
+        function clearCanvas() {
+            stars = [];
+            selectedStars = [];
+            drawStars();
+            document.getElementById('planetDescription').innerText = '';
+        }
+
+        function goBack() {
+            document.getElementById('homeScreen').style.display = 'flex';
+            document.getElementById('canvasContainer').style.display = 'none';
+            clearCanvas();
+        }
+
+        function exportCanvas() {
+            canvas.toBlob(function(blob) {
+                saveAs(blob, 'star_chart.png');
+            });
+        }
+
+        function loadRandomStars() {
+            stars = generateSeededStars(15, Math.random() * 1000);
+            drawStars();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exoplanet Star Chart Explorer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #canvasContainer {
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        #canvas {
+            border: 1px solid black;
+            cursor: crosshair;
+            background-color: black;
+        }
+        .form-control {
+            margin: 10px;
+        }
+        #instructions {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="homeScreen">
+        <h1>Select an Exoplanet:</h1>
+        <button onclick="navigateToStarChart('Kepler-186f')">Kepler-186f</button>
+        <button onclick="navigateToStarChart('Proxima Centauri b')">Proxima Centauri b</button>
+        <button onclick="navigateToStarChart('TRAPPIST-1e')">TRAPPIST-1e</button>
+        <button onclick="navigateToStarChart('LHS 1140 b')">LHS 1140 b</button>
+        <button onclick="navigateToStarChart('HD 209458 b')">HD 209458 b</button>
+        <button onclick="navigateToStarChart('55 Cancri e')">55 Cancri e</button>
+        <button onclick="navigateToStarChart('GJ 357 d')">GJ 357 d</button>
+        <button onclick="navigateToStarChart('K2-18 b')">K2-18 b</button>
+        <button onclick="navigateToStarChart('Gliese 832 c')">Gliese 832 c</button>
+        <button onclick="navigateToStarChart('HD 40307 g')">HD 40307 g</button>
+    </div>
+
+    <div id="canvasContainer">
+        <h1 id="starChartTitle"></h1>
+        <canvas id="canvas" width="700" height="700"></canvas>
+        <div id="instructions">Click on stars to select and name them, then draw constellations.</div>
+        <input type="text" id="starNameInput" class="form-control" placeholder="Enter star name" />
+        <button onclick="clearCanvas()">Clear Constellation</button>
+        <button onclick="exportCanvas()">Export as Image</button>
+        <button onclick="goBack()">Go Back</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script>
+        let stars = [];
+        let selectedStars = [];
+        let hoveredStar = null;
+        let isDrawing = false;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let scale = 1;
+        let panX = 0, panY = 0;
+        
+        function navigateToStarChart(planetName) {
+            document.getElementById('homeScreen').style.display = 'none';
+            document.getElementById('canvasContainer').style.display = 'flex';
+            document.getElementById('starChartTitle').innerText = `Star Chart for ${planetName}`;
+            loadStarDataForPlanet(planetName); // Load real star data for each planet
+            drawStars();
+        }
+
+        // Placeholder for loading actual star data for exoplanets
+        function loadStarDataForPlanet(planetName) {
+            stars = []; // Reset stars
+            switch (planetName) {
+                case 'Kepler-186f':
+                    // Add real star data here
+                    stars = generateRandomStars(15); // Example: Replace with actual star data
+                    break;
+                case 'Proxima Centauri b':
+                    stars = generateRandomStars(12);
+                    break;
+                case 'TRAPPIST-1e':
+                    stars = generateRandomStars(20);
+                    break;
+                default:
+                    stars = generateRandomStars(10);
+            }
+        }
+
+        function generateRandomStars(numStars) {
+            let generatedStars = [];
+            for (let i = 0; i < numStars; i++) {
+                generatedStars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    name: '',
+                    selected: false
+                });
+            }
+            return generatedStars;
+        }
+
+        function drawStars() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous drawings
+            ctx.setTransform(scale, 0, 0, scale, panX, panY); // Apply zoom/pan transformation
+
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, 5, 0, 2 * Math.PI); // Draw a star
+                ctx.fillStyle = hoveredStar === star ? 'white' : (star.selected ? 'red' : 'yellow');
+                ctx.fill();
+                ctx.closePath();
+
+                if (star.name) {
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(star.name, star.x + 10, star.y - 10);
+                }
+            });
+
+            // Draw lines for selected stars
+            if (selectedStars.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(selectedStars[0].x, selectedStars[0].y);
+                selectedStars.forEach(star => {
+                    ctx.lineTo(star.x, star.y);
+                });
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        canvas.addEventListener('click', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / scale - panX / scale;
+            const y = (event.clientY - rect.top) / scale - panY / scale;
+
+            let clickedStar = stars.find(star => Math.hypot(star.x - x, star.y - y) < 10);
+            if (clickedStar) {
+                clickedStar.selected = !clickedStar.selected;
+
+                if (clickedStar.selected) {
+                    const starName = document.getElementById('starNameInput').value;
+                    if (starName) {
+                        clickedStar.name = starName; // Assign the star name
+                        document.getElementById('starNameInput').value = ''; // Clear input
+                    }
+                    selectedStars.push(clickedStar);
+                } else {
+                    selectedStars = selectedStars.filter(star => star !== clickedStar);
+                }
+            }
+            drawStars();
+        });
+
+        canvas.addEventListener('mousemove', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / scale - panX / scale;
+            const y = (event.clientY - rect.top) / scale - panY / scale;
+
+            hoveredStar = stars.find(star => Math.hypot(star.x - x, star.y - y) < 10);
+            drawStars();
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            hoveredStar = null;
+            drawStars();
+        });
+
+        function clearCanvas() {
+            selectedStars = [];
+            stars.forEach(star => {
+                star.selected = false;
+                star.name = '';
+            });
+            drawStars();
+        }
+
+        function exportCanvas() {
+            canvas.toBlob(function(blob) {
+                saveAs(blob, 'star_chart.png');
+            });
+        }
+
+        function goBack() {
+            document.getElementById('canvasContainer').style.display = 'none';
+            document.getElementById('homeScreen').style.display = 'flex';
+            clearCanvas();
+        }
+
+        // Zoom and Pan functionality
+        canvas.addEventListener('wheel', function(event) {
+            event.preventDefault();
+            const zoomAmount = 0.1;
+            if (event.deltaY > 0) {
+                scale = Math.max(0.1, scale - zoomAmount);
+            } else {
+                scale = Math.min(5, scale + zoomAmount);
+            }
+            drawStars();
+        });
+
+        let isPanning = false;
+        let startX, startY;
+
+        canvas.addEventListener('mousedown', function(event) {
+            isPanning = true;
+            startX = event.clientX - panX;
+            startY = event.clientY - panY;
+        });
+
+        canvas.addEventListener('mousemove', function(event) {
+            if (isPanning) {
+                panX = event.clientX - startX;
+                panY = event.clientY - startY;
+                drawStars();
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            isPanning = false;
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            isPanning = false;
+        });
+
+    </script>
+
+</body>
+</html>
